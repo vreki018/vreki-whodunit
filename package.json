@@ -1,0 +1,14 @@
+{
+  "name": "vreki-whodunit",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ใครคือฆาตกร? — AI หลายค่ายเล่นเกมหาฆาตกรบนสถานีอวกาศเป็นภาษาไทย (จากคลิป VreKi_)",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test",
+    "start": "node app/launch.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

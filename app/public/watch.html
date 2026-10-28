@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="th" class="look-color">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ใครคือฆาตกร?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:ital,wght@0,600;0,800;1,800;1,900&family=Mali:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* the clip's prototype — same comic-ink language as the werewolf game's room (black page, paper, ink, one spot red) */
+  :root { --page:#0A0A0A; --paper:#F3F0E9; --ink:#111111; --red:#D7262E; --grey:#A9A59D; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--page); overflow:hidden; font-family:'Mali','Sarabun',sans-serif; color:#fff; }
+  #stage { position:absolute; left:50%; top:50%; width:1920px; height:1080px; transform-origin:center; background:var(--page); overflow:hidden; }
+  #map { position:absolute; inset:0; }
+  .avatar .o { stroke:var(--ink); stroke-width:4.2; stroke-linejoin:round; }
+
+  .rlabel { position:absolute; background:var(--ink); color:#fff; font:800 22px/1 'Kanit',sans-serif; padding:5px 12px 7px 8px; transform:translateY(-55%); white-space:nowrap;
+    display:flex; align-items:center; gap:8px; }
+  .rlabel .ri { width:32px; height:32px; fill:none; stroke:#fff; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex:none; }
+
+  .tok { position:absolute; width:68px; height:68px; margin:-34px 0 0 -34px; will-change:transform; }
+  .tok .disc { position:absolute; inset:0; border-radius:50%; background:var(--paper); border:6px solid var(--c); outline:4px solid var(--ink); overflow:hidden; }
+  .tok .disc svg { position:absolute; left:-6px; top:-4px; width:68px; height:68px; }
+  .tok .nm { position:absolute; top:74px; left:50%; transform:translateX(-50%); background:#fff; color:var(--ink); border:3px solid var(--ink);
+    font:800 17px/1.15 'Kanit',sans-serif; padding:1px 7px 2px; white-space:nowrap; }
+  .tok .ring { position:absolute; left:-14px; top:-14px; width:96px; height:96px; pointer-events:none; }
+  .tok .ring circle { fill:none; stroke-width:7; }
+  .tok .ring .bg { stroke:var(--ink); stroke-width:11; }
+  .tok .ring .fg { stroke:var(--paper); stroke-linecap:butt; transform:rotate(-90deg); transform-origin:48px 48px; }
+  /* fake tasks draw the same ring as real ones (VreKi 2026-10-28: the dashed ring gave the impostors away); the source's I debug key that tinted them red is not in the release */
+  .show-imp .tok.fake .ring .fg { stroke:var(--red); }
+  /* task done: a check floats up from the head and fades (VreKi 2026-10-28) */
+  .tok .done { position:absolute; left:50%; top:-30px; width:44px; height:44px; margin-left:-22px; border-radius:50%; background:#fff; border:4px solid var(--ink);
+    display:flex; align-items:center; justify-content:center; z-index:4; pointer-events:none; }
+  .tok .done svg { width:28px; height:28px; fill:none; stroke:var(--ink); stroke-width:4; stroke-linecap:round; stroke-linejoin:round; }
+  /* anonymous map (VreKi 2026-10-28): viewers know as little as the AIs — every player is the same black shadow on the map;
+     names, faces, colours and brand icons only show in meetings, "as told" replays and the truth reveal. &anon=0 turns it off */
+  .tok .disc .sil { display:none; position:absolute; inset:0; width:100%; height:100%; fill:#0c0c0c; }
+  #stage.anon .tok .disc { border-color:#111; background:#4a4a4a; }
+  #stage.anon .tok .disc > svg:not(.sil) { display:none; }
+  #stage.anon .tok .disc .sil { display:block; }
+  #stage.anon .tok .nm, #stage.anon .tok .brand, #stage.anon .tok .imp, #stage.anon .tok .th { display:none !important; }
+  #stage.anon .tok.dead .disc { background:#a8a39a; }
+  #stage.anon .tok.dead .disc .sil { fill:#5d5a55; }
+  .tok .cross { position:absolute; left:50%; top:18px; transform:translateX(-50%) rotate(-10deg); color:var(--red); background:#fff; border:3px solid var(--red);
+    font:900 17px/1 'Kanit',sans-serif; padding:2px 7px 4px; white-space:nowrap; display:none; z-index:2; }
+  /* AI brand icon (VreKi 2026-10-28: show who plays whom from the start, icon only — models are explained in the video) */
+  .brand { position:absolute; border-radius:50%; background:#fff; border:3px solid var(--ink); display:flex; align-items:center; justify-content:center; z-index:2; }
+  .brand img { width:68%; height:68%; object-fit:contain; display:block; }
+  .tok .brand { right:-16px; top:-14px; width:36px; height:36px; }
+  .tok.dead .brand { filter:grayscale(1); }
+  .pn .brand { left:150px; top:14px; width:66px; height:66px; border-width:4px; }
+  .pn.dead .brand { filter:grayscale(1); }
+  #eject .who .brand { right:-6px; top:4px; width:84px; height:84px; border-width:5px; }
+  .tok.dead .disc { transform:rotate(90deg); filter:grayscale(1) brightness(.75); }
+  .tok.dead .cross { display:block; }
+  .tok.dead .nm { background:var(--grey); }
+  .tok .imp { position:absolute; top:-30px; left:50%; transform:translateX(-50%); background:var(--red); color:#fff; font:800 15px/1 'Kanit'; padding:3px 7px 4px; display:none; white-space:nowrap; }
+  .show-imp .tok.isimp .imp { display:block; }
+  .show-imp .tok.isimp .disc { outline-color:var(--red); }
+
+  /* AI thought bubble (event "thought" in the timeline) — god view only, T toggles */
+  .tok .th { position:absolute; bottom:84px; left:50%; transform:translateX(-50%); width:max-content; max-width:300px; background:#fff; color:var(--ink);
+    border:3px solid var(--ink); border-radius:16px; padding:5px 10px 6px; font:600 15px/1.35 'Mali'; display:none; z-index:3; }
+  .tok .th::after { content:''; position:absolute; left:50%; bottom:-13px; width:10px; height:10px; border-radius:50%; background:#fff; border:3px solid var(--ink); }
+  .tok.thinking .th { display:block; }
+  .tok.isimp.thinking .th { border-color:var(--ink); }
+  .show-imp .tok.isimp.thinking .th { border-color:var(--red); }
+  .hud { position:absolute; font-family:'Mali',sans-serif; }
+  #taskbox { left:28px; top:26px; width:430px; }
+  #taskbox .lb { font:800 22px/1 'Kanit'; margin-bottom:8px; }
+  #taskbox .bar { height:30px; border:4px solid var(--paper); outline:3px solid var(--ink); background:#222; position:relative; }
+  #taskbox .fill { position:absolute; left:0; top:0; bottom:0; width:0; background:var(--paper); }
+  #round { left:50%; top:28px; transform:translateX(-50%); font:900 italic 30px/1 'Kanit'; background:var(--paper); color:var(--ink);
+    border:4px solid var(--ink); outline:4px solid var(--paper); padding:6px 22px 9px; }
+  #feed { left:28px; bottom:26px; width:440px; display:none; flex-direction:column; gap:6px; } /* off: VreKi 2026-10-28 */
+  #feed .it { background:var(--paper); color:var(--ink); border:3px solid var(--ink); padding:3px 10px 5px; font:600 17px/1.35 'Mali'; }
+  #feed .it.kill { background:var(--red); color:#fff; }
+  #keys { right:26px; bottom:20px; color:#77736b; font:500 15px/1 'Mali'; }
+  /* release: back to the lobby from every watch page (the file-name corner label of the source is gone) */
+  #corner { position:absolute; right:26px; top:28px; z-index:9; display:flex; gap:14px; align-items:flex-start; }
+  #corner #home { position:static; }
+  #home { background:var(--paper); color:var(--ink); border:4px solid var(--ink); font:800 22px/1 'Kanit'; padding:8px 16px 10px; text-decoration:none; cursor:pointer; }
+  #home:hover { background:#fff; }
+  /* live only: stop the game (spec G4) — the AIs stop being asked at once (runner.js abort) */
+  #stopBtn { display:none; background:var(--ink); color:#fff; border:4px solid var(--paper); outline:3px solid var(--ink); font:800 22px/1 'Kanit'; padding:8px 16px 10px; cursor:pointer; }
+  #stopBtn:hover { background:var(--red); }
+  #stopBtn:disabled { background:#444; cursor:default; }
+  /* live: the viewer caught up with the game and the AIs are still deciding the next tick */
+  #wait { left:50%; bottom:22px; transform:translateX(-50%); display:none; background:var(--paper); color:var(--ink); border:3px solid var(--ink); font:700 22px/1 'Mali'; padding:7px 16px 9px; }
+  /* game halted (quota, error, stop button) or the file could not be read: centred card over a dimmed stage */
+  #halt, #askStop { position:absolute; inset:0; z-index:10; display:none; align-items:center; justify-content:center; background:rgba(10,10,10,.78); }
+  #halt .card, #askStop .card { width:980px; max-width:90%; background:var(--paper); color:var(--ink); border:6px solid var(--ink); outline:5px solid var(--paper); padding:40px 50px 44px; text-align:center; }
+  #halt h2, #askStop h2 { margin:0 0 18px; font:900 italic 72px/1.1 'Kanit'; color:var(--red); }
+  #halt h2.long { font-size:54px; }
+  #halt p { margin:0 0 30px; font:700 28px/1.45 'Mali'; white-space:pre-line; }
+  #halt p:empty { display:none; }
+  #halt a, #askStop button { display:inline-block; background:var(--ink); color:#fff; border:4px solid var(--ink); font:800 30px/1 'Kanit'; padding:12px 28px 15px; text-decoration:none; cursor:pointer; }
+  #halt a:hover, #askStop button:hover { background:var(--red); }
+  #askStop .btns { display:flex; justify-content:center; gap:24px; margin-top:30px; }
+  #askStop button.keep { background:#fff; color:var(--ink); }
+  #askStop button.keep:hover { background:var(--paper); outline:4px solid var(--ink); }
+  #snd { left:50%; top:100px; transform:translateX(-50%); background:var(--red); color:#fff; font:700 17px/1 'Mali'; padding:8px 16px 9px; border:3px solid var(--ink); }
+  #flash { position:absolute; inset:0; background:var(--red); opacity:0; pointer-events:none; }
+
+  #burst { position:absolute; inset:0; display:none; align-items:center; justify-content:center; background:rgba(10,10,10,.55); }
+  #burst svg { position:absolute; width:900px; height:520px; }
+  #burst .t { position:relative; font:900 italic 150px/1 'Kanit'; color:var(--red); -webkit-text-stroke:6px var(--ink); paint-order:stroke fill; transform:rotate(-6deg); }
+
+  #meet { position:absolute; inset:0; background:var(--page); display:none; padding:40px 70px; }
+  #meet { transition:opacity .45s ease; } #meet.fbhide { opacity:0; pointer-events:none; }
+  #meet h2 { margin:0 0 26px; font:900 italic 58px/1 'Kanit'; color:var(--paper); }
+  #meet h2 span { color:var(--red); }
+  #meet .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:26px; }
+  .pn { position:relative; height:420px; background:var(--paper); border:6px solid var(--ink); outline:5px solid var(--paper); color:var(--ink);
+    transition-property:transform,outline-color; transition-duration:.18s; transition-timing-function:ease-out; }
+  .pn { overflow:hidden; }
+  .pn .av { position:absolute; left:-6px; bottom:-4px; width:290px; height:290px; }
+  .pn .hdr { position:absolute; left:14px; top:14px; display:flex; align-items:center; gap:10px; z-index:2; }
+  .pn .hdr .brand { position:static; width:58px; height:58px; border-width:4px; }
+  /* VreKi 2026-10-28: the tag sat in the header row and the speech bubble covered it → under the name instead */
+  .pn .rtag { position:absolute; left:82px; top:74px; z-index:2; background:var(--red); color:#fff; font:900 22px/1 'Kanit'; padding:6px 10px 8px; border:4px solid var(--ink); transform:rotate(-3deg); }
+  .pn .pnm { position:static; background:#fff; border:4px solid var(--ink); font:800 28px/1.1 'Kanit'; padding:2px 12px 4px; }
+  .pn .bub { position:absolute; left:262px; right:14px; top:14px; max-height:380px; overflow:hidden; background:#fff; border:4px solid var(--ink); border-radius:18px;
+    padding:10px 14px; font:700 22px/1.38 'Mali'; opacity:0; }
+  .pn.talk { transform:scale(1.035); outline-color:var(--red); }
+  .pn.talk .bub { opacity:1; }
+  .pn .votes { position:absolute; right:16px; bottom:14px; display:flex; gap:6px; flex-wrap:wrap-reverse; justify-content:flex-end; max-width:240px; z-index:2; }
+  .pn .votes .vc { width:50px; height:50px; border-radius:50%; background:#fff; border:4px solid var(--ink); overflow:hidden; }
+  .pn .votes .vc svg { width:100%; height:100%; }
+  .pn .x { position:absolute; left:40px; top:230px; z-index:3; color:var(--red); border:6px solid var(--red); padding:6px 18px 10px; font:900 54px/1 'Kanit',sans-serif;
+    transform:rotate(-9deg); background:rgba(243,240,233,.85); display:none; }
+  .pn.dead { background:#BDB8AE; }
+  .pn.dead .x { display:block; }
+  .pn.dead .av { filter:grayscale(1); }
+
+  #burst .by { position:absolute; left:50%; top:calc(50% + 150px); transform:translateX(-50%); display:flex; align-items:center; gap:14px; background:var(--paper);
+    border:6px solid var(--ink); padding:8px 22px 8px 8px; font:900 38px/1 'Kanit'; color:var(--ink); white-space:nowrap; }
+  #burst .by:empty { display:none; }
+  #burst .by .fav { width:84px; height:84px; border-radius:50%; overflow:hidden; border:4px solid var(--ink); background:#fff; }
+  #burst .by .fav svg { position:static; inset:auto; transform:none; margin:0; width:100%; height:100%; } /* beat the big '#burst svg' star rule */
+  /* flashback during a meeting line: the map replays the cited moments, the speaker's line as a caption */
+  #fbv { position:absolute; inset:0; pointer-events:none; display:none; }
+  #stage.fb #fbv { display:block; }
+  #stage.fb #taskbox { visibility:hidden; }
+  #stage.fb #map, #stage.fb #labels { filter:grayscale(.55) brightness(.92); }
+  /* the caption covered the bottom rooms (VreKi 2026-10-28): the flashback map shrinks so the rooms end above even a 3-line caption (top 847px) — keep FB_ZOOM in sync */
+  #stage.fb #map, #stage.fb #labels, #stage.fb #toks { transform:scale(.85); transform-origin:960px 88px; }
+  #fbv .lbl { position:absolute; left:40px; top:30px; background:var(--red); color:#fff; font:900 italic 40px/1 'Kanit'; padding:10px 20px 14px; border:5px solid var(--ink); transform:rotate(-2deg); }
+  #fbcap { position:absolute; left:50%; bottom:34px; transform:translateX(-50%); display:flex; align-items:center; gap:16px; width:max-content; max-width:1500px; }
+  #fbcap .fav { width:120px; height:120px; flex:none; border-radius:50%; background:var(--paper); border:6px solid var(--ink); overflow:hidden; }
+  #fbcap .fav svg { width:100%; height:100%; }
+  #fbcap .brand { position:relative; width:58px; height:58px; flex:none; margin-left:-56px; margin-top:-80px; border-width:4px; }
+  #fbcap .ftx { background:#fff; border:6px solid var(--ink); border-radius:22px; padding:12px 22px 16px; font:700 30px/1.4 'Mali'; color:var(--ink); }
+  #fbcap .ftx b { display:block; font:900 26px/1.1 'Kanit'; margin-bottom:4px; }
+  .tok.fbdim { opacity:.3; }
+  .tok.fbfocus .disc { outline:6px solid var(--red); }
+  /* ม่านเงา + shots + roles card (game 2) */
+  #stage.shadowfx #map, #stage.shadowfx #labels { filter:brightness(.42) contrast(1.1); }
+  #stage.shadowfx .tok .disc { box-shadow:0 0 0 4px #8d877c; } /* shadows on a dark map still need an edge */
+  #shadowban { position:absolute; left:50%; top:110px; transform:translateX(-50%); display:none; flex-direction:column; align-items:center; gap:6px; z-index:5;
+    background:#050505; border:6px solid var(--paper); outline:5px solid var(--ink); padding:14px 34px 18px; }
+  #shadowban b { font:900 italic 76px/1 'Kanit'; color:var(--paper); }
+  #shadowban span { font:700 26px/1.2 'Mali'; color:#bdb7ab; }
+  #shadowban.small { top:auto; bottom:30px; left:auto; right:30px; transform:none; padding:8px 18px 10px; }
+  #shadowban.small b { font-size:34px; } #shadowban.small span { display:none; }
+  .bang { position:absolute; z-index:6; font:900 italic 64px/1 'Kanit'; color:var(--red); background:#fff; border:6px solid var(--ink); padding:4px 18px 10px; transform:translate(-50%,-50%); pointer-events:none; }
+  #roles { position:absolute; inset:0; background:rgba(10,10,10,.95); display:none; flex-direction:column; align-items:center; justify-content:center; gap:50px; z-index:7; }
+  #roles h2 { margin:0; font:900 italic 84px/1.1 'Kanit'; color:var(--paper); } #roles h2 span { color:var(--red); margin-left:16px; }
+  #roles .ppl { display:flex; gap:34px; }
+  #roles .gp { position:relative; display:flex; flex-direction:column; align-items:center; gap:10px; }
+  #roles .gp .fav { width:160px; height:160px; border-radius:50%; overflow:hidden; background:var(--paper); border:7px solid var(--paper); outline:5px solid var(--ink); }
+  #roles .gp .fav svg { width:100%; height:100%; }
+  #roles .gp .brand { position:absolute; right:-6px; top:-4px; width:56px; height:56px; border-width:4px; }
+  #roles .gn { font:900 32px/1 'Kanit'; color:var(--paper); }
+  #roles .rl { font:900 26px/1 'Kanit'; color:var(--ink); background:var(--paper); padding:6px 14px 8px; border:4px solid var(--ink); }
+  #roles .gp.bad .rl { background:var(--red); color:#fff; } #roles .gp.bad .fav { border-color:var(--red); }
+  #roles .gp.odd .rl { background:#111; color:var(--paper); border-color:var(--paper); }
+  #guess { position:absolute; inset:0; background:rgba(10,10,10,.93); display:none; flex-direction:column; align-items:center; justify-content:center; gap:46px; z-index:6; }
+  #guess h2 { margin:0; font:900 italic 84px/1.1 'Kanit'; color:var(--paper); }
+  #guess h2 span { color:var(--red); margin-left:16px; }
+  #guess .ppl { display:flex; gap:38px; }
+  #guess .gp { position:relative; display:flex; flex-direction:column; align-items:center; gap:10px; }
+  #guess .gp .fav { width:170px; height:170px; border-radius:50%; overflow:hidden; background:var(--paper); border:7px solid var(--paper); outline:5px solid var(--ink); }
+  #guess .gp .fav svg { width:100%; height:100%; }
+  #guess .gp .brand { position:absolute; right:-6px; top:-4px; width:58px; height:58px; border-width:4px; }
+  #guess .gn { font:900 34px/1 'Kanit'; color:var(--paper); }
+  #guess .bar { width:900px; height:16px; background:#333; border:3px solid var(--paper); }
+  #guess .bar i { display:block; height:100%; background:var(--red); transform-origin:left; }
+  #stage.truth #fbv .lbl { background:var(--paper); color:var(--red); }
+  #stage.truth #round, #stage.truth #taskbox { visibility:hidden; }
+  #eject { position:absolute; inset:0; background:var(--page); display:none; }
+  #eject .who { position:absolute; width:230px; height:230px; top:250px; }
+  #eject .t { position:absolute; left:0; right:0; top:560px; text-align:center; font:900 italic 96px/1.1 'Kanit'; color:var(--paper); }
+  #eject .s { position:absolute; left:0; right:0; top:700px; text-align:center; font:800 40px/1.2 'Kanit'; color:var(--red); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <svg id="map" viewBox="0 0 1920 1080" width="1920" height="1080" aria-hidden="true">
+    <defs>
+      <pattern id="toneL" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#fff"/><circle cx="4" cy="4" r="1.1" fill="#111"/></pattern>
+      <pattern id="toneM" width="7" height="7" patternUnits="userSpaceOnUse"><rect width="7" height="7" fill="#fff"/><circle cx="3.5" cy="3.5" r="1.8" fill="#111"/></pattern>
+      <pattern id="floor" width="12" height="12" patternUnits="userSpaceOnUse"><rect width="12" height="12" fill="#ECE7DC"/><circle cx="6" cy="6" r="1.15" fill="#C9C2B2"/></pattern>
+      <pattern id="hall" width="10" height="10" patternUnits="userSpaceOnUse"><rect width="10" height="10" fill="#CFC8B8"/><circle cx="5" cy="5" r="1.3" fill="#9E9786"/></pattern>
+    </defs>
+    <g id="halls"></g><g id="rooms"></g><g id="props"></g>
+  </svg>
+  <div id="labels"></div>
+  <div id="toks"></div>
+  <div class="hud" id="taskbox"><div class="lb">ภารกิจรวม</div><div class="bar"><div class="fill" id="fill"></div></div></div>
+  <div class="hud" id="round">รอบที่ 1</div>
+  <div class="hud" id="feed"></div>
+  <div class="hud" id="keys">Space หยุด · 1 2 3 ความเร็ว · T ความคิด AI · M เสียง · R เริ่มใหม่</div>
+  <div class="hud" id="wait">รอ AI คิดตาถัดไป…</div>
+  <div class="hud" id="snd">เสียงยังปิด · คลิกจอ 1 ครั้งเพื่อเปิด</div>
+  <div id="flash"></div>
+  <div id="burst"><svg viewBox="0 0 900 520"><polygon id="burstPoly" fill="#F3F0E9" stroke="#111" stroke-width="8" stroke-linejoin="round"/></svg><div class="t">พบศพ!</div><div class="by" id="burstBy"></div></div>
+  <div id="shadowban"><b>ม่านเงา!</b><span>คนร้ายทำให้ทุกคนกลายเป็นเงาดำ · ไม่มีใครจำหน้าใครได้</span></div>
+  <div id="roles"><h2>บทบาท<span>ทั้งหมด</span></h2><div class="ppl"></div></div>
+  <div id="guess"><h2>คุณคิดว่า<span>ใครคือคนร้าย?</span></h2><div class="ppl"></div><div class="bar"><i></i></div></div>
+  <div id="fbv"><div class="lbl">ย้อนดูเหตุการณ์</div><div id="fbcap"></div></div>
+  <div id="meet"><h2><b id="meetKind">พบศพ</b> · <span>ใครคือคนร้าย?</span></h2><div class="grid" id="panels"></div></div>
+  <div id="eject"><div class="who" id="ejWho"></div><div class="t" id="ejT"></div><div class="s" id="ejS"></div></div>
+  <div id="corner"><button id="stopBtn" type="button">หยุดเกม</button><a class="hud" id="home" href="/">กลับหน้าแรก</a></div>
+  <div id="halt"><div class="card"><h2 id="haltT">เกมหยุดแล้ว</h2><p id="haltM"></p><a href="/">กลับหน้าแรก</a></div></div>
+  <div id="askStop" role="alertdialog" aria-labelledby="askStopT"><div class="card"><h2 id="askStopT">หยุดเกมนี้เลยไหม?</h2><div class="btns"><button type="button" class="stop" data-stop="yes">หยุดเกม</button><button type="button" class="keep" data-stop="no">ดูต่อ</button></div></div></div>
+</div>
+<script src="avatars.js"></script>
+<script src="sfx.js"></script>
+<script>
+'use strict';
+/* ---------- map ---------- */
+const ROOMS = {
+  A:{name:'ห้องเครื่องยนต์', x:120, y:390, w:300, h:300},
+  B:{name:'ห้องพยาบาล', x:480, y:140, w:260, h:220},
+  C:{name:'ห้องประชุม', x:770, y:110, w:380, h:290},
+  D:{name:'ห้องออกซิเจน', x:1180, y:140, w:260, h:220},
+  E:{name:'ห้องกล้อง', x:490, y:460, w:240, h:200},
+  F:{name:'ห้องนำทาง', x:1530, y:390, w:290, h:300},
+  G:{name:'ห้องไฟฟ้า', x:460, y:745, w:290, h:215},
+  H:{name:'คลังสินค้า', x:780, y:640, w:360, h:320},
+  I:{name:'ห้องสื่อสาร', x:1180, y:745, w:270, h:215},
+};
+// room icons for the labels (VreKi 2026-10-28: rooms were hard to tell apart) — plain ink line icons, 24×24
+const ROOM_ICON = {
+  A:'<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="6.8"/><path d="M12 2.5v2.7M12 18.8v2.7M2.5 12h2.7M18.8 12h2.7M5.3 5.3l1.9 1.9M16.8 16.8l1.9 1.9M5.3 18.7l1.9-1.9M16.8 7.2l1.9-1.9"/>',
+  B:'<rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M12 7.5v9M7.5 12h9"/>',
+  C:'<path d="M3 4.5h11v7.5H8.5L5 15v-3H3z"/><path d="M16.5 9H21v7.5h-2V20l-3.5-3.5H11v-2"/>',
+  D:'<circle cx="9.5" cy="13.5" r="6.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="19" cy="14" r="1.5"/><text x="9.5" y="16" font-size="7" font-weight="800" text-anchor="middle" fill="currentColor" stroke="none">O2</text>',
+  E:'<path d="M3.5 7.5l12-3 1.8 6.5-12 3z"/><path d="M17 8.6l3.5-1.2 1 3.6-3.5 1"/><path d="M8.5 13l1 4.5H5.5M5.5 15v6"/>',
+  F:'<circle cx="12" cy="12" r="9"/><path d="M15.8 8.2l-2.3 5.3-5.3 2.3 2.3-5.3z"/>',
+  G:'<path d="M13.5 2.5L5 13.5h6.2l-1.2 8 8.5-11.2h-6.2z"/>',
+  H:'<path d="M3 11h8.5v9.5H3zM12.5 11H21v9.5h-8.5zM7.5 3h9v8h-9z"/><path d="M7.3 11v3M16.8 11v3M12 3v3"/>',
+  I:'<path d="M4.5 17.5a8 8 0 0 1 .5-11l11 11a8 8 0 0 1-11.5 0z"/><path d="M10.5 12l4.5-4.5"/><circle cx="16" cy="6.5" r="1.4"/><path d="M18 2.8a5 5 0 0 1 3.2 3.2M8 21.5h6"/>',
+};
+const EDGES = {
+  'A-B':[[270,390],[270,250],[480,250]], 'A-G':[[270,690],[270,852],[460,852]], 'A-E':[[420,560],[490,560]],
+  'B-C':[[740,250],[770,250]], 'C-D':[[1150,250],[1180,250]], 'C-H':[[960,400],[960,640]],
+  'E-H':[[730,560],[870,560],[870,640]], 'G-H':[[750,852],[780,852]], 'H-I':[[1140,852],[1180,852]],
+  'D-F':[[1440,250],[1675,250],[1675,390]], 'I-F':[[1450,852],[1675,852],[1675,690]], 'F-H':[[1530,540],[1250,540],[1250,700],[1140,700]],
+};
+const VENTS = { G:[712,925], I:[1218,925], B:[705,322], E:[700,628] };
+const C_SLOTS = [[855,205],[1065,205],[828,318],[922,345],[1016,345],[1108,318]];
+const OFFS = [[0,0],[-88,0],[88,0],[-44,-80],[44,-80],[0,80]];
+const NS = 'http://www.w3.org/2000/svg';
+// AI text (meeting lines) and anything else read from a game file goes into innerHTML only through esc()
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
+const svgEl = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent.appendChild(e); return e; };
+
+function drawMap() {
+  const halls = document.getElementById('halls'), rooms = document.getElementById('rooms'), props = document.getElementById('props');
+  for (const k in EDGES) {
+    const pts = EDGES[k].map(p => p.join(',')).join(' ');
+    svgEl('polyline', {points:pts, fill:'none', stroke:'#111', 'stroke-width':66, 'stroke-linejoin':'miter', 'stroke-linecap':'square'}, halls);
+  }
+  for (const k in EDGES) {
+    const pts = EDGES[k].map(p => p.join(',')).join(' ');
+    svgEl('polyline', {points:pts, fill:'none', stroke:'url(#hall)', 'stroke-width':50, 'stroke-linejoin':'miter', 'stroke-linecap':'square'}, halls);
+  }
+  const lab = document.getElementById('labels');
+  for (const k in ROOMS) {
+    const r = ROOMS[k];
+    svgEl('rect', {x:r.x, y:r.y, width:r.w, height:r.h, fill:'url(#floor)', stroke:'#111', 'stroke-width':8}, rooms);
+    svgEl('rect', {x:r.x + 12, y:r.y + 12, width:r.w - 24, height:r.h - 24, fill:'none', stroke:'#111', 'stroke-width':2, 'stroke-dasharray':'2 7'}, rooms);
+    const d = document.createElement('div'); d.className = 'rlabel'; d.innerHTML = `<svg class="ri" viewBox="0 0 24 24">${ROOM_ICON[k] || ''}</svg><span>${r.name}</span>`;
+    d.style.left = (r.x + 14) + 'px'; d.style.top = r.y + 'px'; lab.appendChild(d);
+  }
+  // props: simple inked shapes, no images
+  svgEl('circle', {cx:960, cy:232, r:48, fill:'#F3F0E9', stroke:'#111', 'stroke-width':7}, props);
+  svgEl('circle', {cx:960, cy:232, r:17, fill:'#D7262E', stroke:'#111', 'stroke-width':5}, props);
+  svgEl('rect', {x:136, y:415, width:58, height:150, fill:'url(#toneM)', stroke:'#111', 'stroke-width':6}, props);
+  svgEl('rect', {x:136, y:585, width:58, height:90, fill:'url(#toneM)', stroke:'#111', 'stroke-width':6}, props);
+  svgEl('rect', {x:500, y:178, width:44, height:96, fill:'#fff', stroke:'#111', 'stroke-width':5}, props);
+  svgEl('rect', {x:1155, y:668, width:0, height:0}, props);
+  for (const [x, y] of [[800,890],[848,890],[800,842],[1088,668],[1088,716]]) svgEl('rect', {x, y, width:44, height:44, fill:'url(#toneL)', stroke:'#111', 'stroke-width':5}, props);
+  for (let i = 0; i < 4; i++) svgEl('rect', {x:478 + i * 40, y:762, width:30, height:44, fill:'#fff', stroke:'#111', 'stroke-width':4}, props);
+  svgEl('path', {d:'M1560 420 h230 v34 h-230 Z', fill:'url(#toneL)', stroke:'#111', 'stroke-width':5}, props);
+  svgEl('path', {d:'M1205 760 h60 v40 h-60 Z M1280 760 h60 v40 h-60 Z', fill:'#fff', stroke:'#111', 'stroke-width':4}, props);
+  svgEl('circle', {cx:1405, cy:185, r:22, fill:'url(#toneM)', stroke:'#111', 'stroke-width':5}, props);
+  svgEl('rect', {x:505, y:478, width:90, height:30, fill:'#fff', stroke:'#111', 'stroke-width':4}, props);
+  for (const k in VENTS) {
+    const [x, y] = VENTS[k];
+    const g = svgEl('g', {}, props);
+    svgEl('rect', {x:x - 22, y:y - 14, width:44, height:28, fill:'#333', stroke:'#111', 'stroke-width':5}, g);
+    for (let i = -12; i <= 12; i += 8) svgEl('line', {x1:x + i, y1:y - 10, x2:x + i, y2:y + 10, stroke:'#888', 'stroke-width':2}, g);
+  }
+}
+
+/* ---------- cast + demo script ---------- */
+const CAST = [
+  {id:'jaem', name:'ป้าแจ่ม', color:'#C2566B'}, {id:'perm', name:'ลุงเพิ่ม', color:'#8A9A5B'},
+  {id:'fah', name:'น้องฟ้า', color:'#4FA3D1'}, {id:'wit', name:'ครูวิทย์', color:'#7C6BC4'},
+  {id:'muay', name:'เจ๊หมวย', color:'#D08B3E'}, {id:'tee', name:'ตี๋', color:'#3FA88B', imp:true},
+];
+const SCRIPT = {
+  jaem:[['until',0.8],['go',['B']],['task',4],['go',['C']],['task',3.5],['go',['B']],['task',4]],
+  perm:[['until',0.4],['go',['H']],['task',4],['task',3],['until',13.4],['go',['G']],['report']],
+  fah: [['until',0.6],['go',['H','G']],['task',4],['task',20]],
+  wit: [['until',1.0],['go',['D']],['task',5],['go',['F']],['task',5]],
+  muay:[['until',1.2],['go',['B','A']],['task',5],['task',5]],
+  tee: [['until',2.0],['go',['H','G']],['fake',2.5],['until',9.6],['kill','fah'],['vent','I'],['fake',3],['go',['H']]],
+};
+const MEETING = {
+  lines:[
+    ['perm','ลุงเจอน้องฟ้านอนอยู่ในห้องไฟฟ้า เมื่อกี้ใครเดินผ่านแถวนั้นบ้าง'],
+    ['jaem','ป้าเห็นตี๋เดินลงไปทางคลังสินค้าตั้งแต่ต้นรอบเลยนะ!'],
+    ['tee','ผมอยู่ห้องสื่อสารตลอดพี่ ทำภารกิจอยู่ ไม่ได้ไปไหนเลย'],
+    ['wit','ห้องสื่อสารไม่มีทางเดินไปห้องไฟฟ้าตรงๆ นะ ครูว่าแปลก'],
+    ['muay','เจ๊ว่าลุงเพิ่มนั่นแหละ เจอศพเอง แจ้งเอง หน้าตาเฉย'],
+  ],
+  votes:[['perm','tee'],['jaem','tee'],['tee','perm'],['muay','perm'],['wit','perm']],
+  out:'perm',
+};
+// VreKi 2026-10-28: "ไวจนดูไม่ทันว่าใครทำอะไร" → 1.6 → 2.6 s per tick, then "ยังรู้สึกว่าเดินเร็วอยู่" → 3.6 s + walking 230 → 120 px/s
+// … then again "อยากให้ช้ากว่านี้อีกนิดนึง" → 5.0 s per tick, walking floor 85 px/s
+const TASK_TOTAL = 12, SPEED = 120, TICK = 5.0, WALK_SPEED = 85; // SPEED = script mode, WALK_SPEED = timeline floor
+let TL = null, MEETINGS = null, WIN = null, SEATS = null;
+/* sound: synthesized in sfx.js (no files from other games) · browsers start audio only after a click or key */
+const AUD = SFX.player(); let QUIET = false;
+const sfx = (n, o) => { if (!QUIET) AUD.play(n, o); };
+const PITCH = {jaem:1.1, perm:0.8, fah:1.3, wit:0.95, muay:1.05, tee:1.2};
+const LOGO = {claude:'logos/claude.svg', codex:'logos/openai_2025.svg', gemini:'logos/gemini.svg', agy:'logos/gemini.svg'}; // real logos, sources in logos/SOURCES.md
+const brandHTML = (c) => (c && LOGO[c.seat] ? `<div class="brand"><img src="${LOGO[c.seat]}" alt=""></div>` : '');
+/* character voices: runner.js writes <timeline>_voice/manifest.json + one mp3 per meeting line while the game runs (tts.py) */
+let VOICE = null, VOICE_BASE = '', VA = null, VOICE_ON = false, VOICE_MF = '', vBusy = false, vLast = -Infinity;
+const VOICE_POLL = 1500, VOICE_WAIT = 25000; // live: re-read the manifest every 1.5 s while a meeting waits · start without the missing voices after 25 s
+function loadVoice() {
+  if (!VOICE_ON || vBusy) return;
+  vBusy = true; vLast = performance.now();
+  fetch(VOICE_MF, {cache:'no-store'}).then(r => (r.ok ? r.json() : null)).then(j => {
+    if (!j || !Array.isArray(j.lines)) return;
+    const v = {}; for (const l of j.lines) (v[l.m] = v[l.m] || {})[l.i] = l; VOICE = v;
+  }).catch(() => {}).finally(() => { vBusy = false; });
+}
+// every line of meeting m has a manifest entry (its file may be null = that line failed and plays without sound)
+const voicedAll = (m) => { const M = MEETINGS && MEETINGS[m], v = VOICE && VOICE[m]; return !!(M && v && M.lines.every((_, i) => v[i] !== undefined)); };
+const slot = (m, i) => { const v = VOICE && VOICE[m] && VOICE[m][i]; return v && v.dur ? Math.max(3.1, v.dur + 0.45) : 3.1; };
+function stopVoice() { if (VA) { VA.pause(); VA = null; } }
+function playVoice(m, i) {
+  stopVoice(); const v = VOICE && VOICE[m] && VOICE[m][i];
+  if (!v || !v.file || QUIET || !AUD.ready() || !AUD.on) return;
+  VA = new Audio(VOICE_BASE + v.file); VA.playbackRate = S.speed; VA.play().catch(() => {});
+}
+function unlockAudio() { if (AUD.ready()) return; AUD.unlock(); AUD.warm(SFX.used); const el = document.getElementById('snd'); if (el) el.style.display = 'none'; }
+
+/* ---------- state ---------- */
+let S, A, occ;
+const stage = document.getElementById('stage'), toksEl = document.getElementById('toks');
+const ring = (p) => { const C = 2 * Math.PI * 40; return `<svg class="ring" viewBox="0 0 96 96"><circle class="bg" cx="48" cy="48" r="40"/><circle class="fg" cx="48" cy="48" r="40" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - p)}"/></svg>`; };
+
+function reset() {
+  S = {t:0, speed:S ? S.speed : 1, paused:false, phase:'play', pt:0, tasks:0, frac:0, mi:0, q:[], showImp:S ? S.showImp : false, showTh:S ? S.showTh : false};
+  occ = {}; for (const k in ROOMS) occ[k] = [];
+  toksEl.innerHTML = ''; document.getElementById('feed').innerHTML = '';
+  ['burst','meet','eject','roles','guess'].forEach(id => document.getElementById(id).style.display = 'none'); // roles/guess: R after the end card left the role cards on top
+  A = {};
+  CAST.forEach((c, i) => {
+    const el = document.createElement('div');
+    el.className = 'tok' + (c.imp ? ' isimp' : ''); el.style.setProperty('--c', c.color);
+    el.innerHTML = `<div class="th"></div><div class="imp">คนร้าย</div><div class="disc">${faceSVG(c.id, c.color)}<svg class="sil" viewBox="0 0 64 64"><circle cx="32" cy="25" r="12.5"/><path d="M8 66c0-15 11-25 24-25s24 10 24 25z"/></svg></div><div class="cross">ศพ</div>${brandHTML(c)}<div class="nm">${c.name}</div><div class="rg"></div>`;
+    toksEl.appendChild(el);
+    const [x, y] = C_SLOTS[i]; occ.C[i] = c.id;
+    A[c.id] = {...c, el, room:'C', slot:i, x, y, q:(TL ? TL.q[c.id] : SCRIPT[c.id]).map(s => s.slice()), busy:null, dead:false, hidden:false};
+  });
+  document.getElementById('round').textContent = 'รอบที่ 1';
+  feed('ทุกคนเริ่มที่ห้องประชุม · มีคนร้าย 1 คน');
+}
+function slotPos(room, i) {
+  if (room === 'C') return C_SLOTS[i];
+  const r = ROOMS[room], cx = r.x + r.w / 2, cy = r.y + r.h * 0.56, o = OFFS[i] || [0, 0];
+  return [cx + o[0], cy + o[1]];
+}
+function claim(room, id) { const o = occ[room]; let i = o.indexOf(null); if (i < 0) i = o.length; if (i > 5) i = 5; o[i] = id; return i; }
+function release(a) { if (occ[a.room][a.slot] === a.id) occ[a.room][a.slot] = null; }
+function edge(a, b) { if (EDGES[a + '-' + b]) return EDGES[a + '-' + b]; if (EDGES[b + '-' + a]) return EDGES[b + '-' + a].slice().reverse(); throw new Error('no hall ' + a + b); }
+function feed(txt, cls) {
+  const f = document.getElementById('feed'), d = document.createElement('div');
+  d.className = 'it' + (cls ? ' ' + cls : ''); d.textContent = txt; f.appendChild(d);
+  while (f.children.length > 5) f.removeChild(f.firstChild);
+}
+
+/* ---------- actors ---------- */
+function startStep(a) {
+  const s = a.q.shift(); if (!s) return;
+  const [type, arg] = s;
+  if (type === 'until') a.busy = {type, until:arg};
+  else if (type === 'think') { a.el.querySelector('.th').textContent = arg; a.thUntil = S.t + TICK * 0.95; }
+  else if (type === 'go') {
+    release(a); const pts = []; let cur = a.room;
+    for (const nx of arg) { pts.push(...edge(cur, nx)); cur = nx; }
+    a.room = cur; a.slot = claim(cur, a.id); pts.push(slotPos(cur, a.slot));
+    a.busy = {type, pts, i:0, spd:walkSpeed(a, pts)};
+  } else if (type === 'task' || type === 'fake') a.busy = {type, t0:S.t, dur:arg, frac:s[2], fin:s[3]};
+  else if (type === 'kill') {
+    const v = A[arg];
+    if (v && !v.dead && v.room === a.room) {
+      v.dead = true; v.busy = null; v.q = []; v.el.classList.add('dead'); v.el.querySelector('.rg').innerHTML = '';
+      if (!QUIET) document.getElementById('flash').animate([{opacity:.45},{opacity:0}], {duration:450 / S.speed}); // ff (stills) skips the flash: headless kept it on screen
+      feed(`${a.name} ฆ่า ${v.name} ที่${ROOMS[a.room].name} · ไม่มีใครเห็น`, 'kill'); sfx('kill');
+    }
+  } else if (type === 'shoot') {
+    const d = A[s[2]];
+    if (d && !d.dead) { d.dead = true; d.busy = null; d.q = []; d.el.classList.add('dead'); d.el.querySelector('.rg').innerHTML = ''; }
+    if (!QUIET) { document.getElementById('flash').animate([{opacity:.55, background:'#fff'}, {opacity:0, background:'#fff'}], {duration:500 / S.speed}); bang(a.x, a.y); }
+    sfx('shot');
+  } else if (type === 'collect') {
+    const b = A[arg];
+    if (b) { if (!QUIET) b.el.animate([{opacity:1, transform:b.el.style.transform}, {opacity:0, transform:b.el.style.transform + ' scale(.5)'}], {duration:900 / S.speed}).onfinish = () => { b.el.style.display = 'none'; };
+      else b.el.style.display = 'none'; b.collected = true; }
+    sfx('collect');
+  } else if (type === 'vent') {
+    release(a); const from = a.room; a.room = arg; a.slot = claim(arg, a.id);
+    const [vx, vy] = VENTS[arg]; a.x = vx; a.y = vy;
+    if (!QUIET) a.el.animate([{opacity:0, transform:`translate(${vx}px,${vy}px) scale(.4)`},{opacity:1, transform:`translate(${vx}px,${vy}px) scale(1)`}], {duration:380 / S.speed});
+    feed(`${a.name} มุดท่อจาก${ROOMS[from].name} ไป${ROOMS[arg].name}`, 'kill'); sfx('vent');
+    a.busy = {type:'go', pts:[slotPos(arg, a.slot)], i:0, spd:walkSpeed(a, [slotPos(arg, a.slot)])};
+  } else if (type === 'report' || type === 'emergency') {
+    feed(type === 'report' ? `${a.name} แจ้งพบศพ!` : `${a.name} กดปุ่มฉุกเฉิน!`);
+    S.phase = 'burst'; S.pt = 0; showBurst(type === 'report' ? 'พบศพ!' : 'ประชุมฉุกเฉิน!'); sfx(type);
+  }
+}
+function updateActor(a, dt) {
+  if (a.dead) return;
+  if (!a.busy) { startStep(a); if (!a.busy) return; }
+  const b = a.busy;
+  if (b.type === 'until') { if (S.t >= b.until) a.busy = null; return; }
+  if (b.type === 'go') {
+    let left = (b.spd || SPEED) * dt;
+    while (left > 0 && b.i < b.pts.length) {
+      const [tx, ty] = b.pts[b.i], dx = tx - a.x, dy = ty - a.y, d = Math.hypot(dx, dy);
+      if (d <= left) { a.x = tx; a.y = ty; left -= d; b.i++; } else { a.x += dx / d * left; a.y += dy / d * left; left = 0; }
+    }
+    if (b.i >= b.pts.length) a.busy = null;
+    return;
+  }
+  if (b.type === 'task' || b.type === 'fake') {
+    const p = Math.min(1, (S.t - b.t0) / b.dur);
+    a.el.classList.toggle('fake', b.type === 'fake');
+    a.el.querySelector('.rg').innerHTML = ring(p);
+    if (p >= 1) {
+      a.el.querySelector('.rg').innerHTML = ''; a.busy = null;
+      if (b.type === 'task') {
+        if (b.frac != null) S.frac = b.frac; else S.tasks++;
+        if (b.frac == null || b.fin) { feed(`${a.name} ทำภารกิจเสร็จที่${ROOMS[a.room].name}`); sfx('task_done'); doneMark(a); }
+      } else if (b.fin) { sfx('task_done'); doneMark(a); } // a fake run ends with the same check + sound, so the map gives no one away (the task bar still only moves for real work)
+    }
+  }
+}
+// a fake task is the last of its run when the same player is not faking in the same room on the next tick
+function fakeRunEnds(tl, i) {
+  const e = tl[i];
+  for (let j = i + 1; j < tl.length; j++) {
+    const n = tl[j]; if (n.tick > e.tick + 1) break;
+    if (n.tick === e.tick + 1 && n.type === 'task' && n.id === e.id) return !(n.fake && n.room === e.room);
+  }
+  return true;
+}
+
+/* ---------- report → meeting → eject ---------- */
+function doneMark(a) {
+  if (QUIET) return;
+  const d = document.createElement('div'); d.className = 'done'; d.innerHTML = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  a.el.appendChild(d);
+  d.animate([{transform:'translateY(8px) scale(.6)', opacity:0}, {transform:'translateY(0) scale(1.1)', opacity:1, offset:.15}, {transform:'translateY(-10px) scale(1)', opacity:1, offset:.45},
+    {transform:'translateY(-48px) scale(1)', opacity:0}], {duration:2200 / S.speed, easing:'ease-out'}).onfinish = () => d.remove();
+}
+function showBurst(txt) {
+  fx('shadow_off');
+  document.querySelector('#burst .t').textContent = txt || 'พบศพ!';
+  const M = MEETINGS && MEETINGS[S.mi], by = M && CAST.find(c => c.id === M.by), body = M && CAST.find(c => c.id === M.body);
+  document.getElementById('burstBy').innerHTML = by ? `<div class="fav">${faceSVG(by.id, by.color)}</div>${by.name} ${M.kind === 'report' ? 'เป็นคนพบศพ' + (body ? body.name : '') : 'กดปุ่มประชุมฉุกเฉิน'}` : '';
+  const pts = []; for (let i = 0; i < 26; i++) { const ang = i / 26 * Math.PI * 2, rr = i % 2 ? 150 : 255; pts.push((450 + Math.cos(ang) * rr * 1.55).toFixed(0) + ',' + (260 + Math.sin(ang) * rr * .82).toFixed(0)); }
+  document.getElementById('burstPoly').setAttribute('points', pts.join(' '));
+  document.getElementById('burst').style.display = 'flex';
+}
+function buildMeeting() {
+  const box = document.getElementById('panels'); box.innerHTML = '';
+  CAST.forEach(c => {
+    const d = document.createElement('div'); d.className = 'pn' + (A[c.id].dead ? ' dead' : ''); d.id = 'pn-' + c.id;
+    d.innerHTML = `<div class="av">${avatarSVG(c.id, c.color)}</div><div class="hdr">${brandHTML(c)}<div class="pnm">${c.name}</div></div>${rtag(c.id)}<div class="bub"></div><div class="votes"></div><div class="x">ตายแล้ว</div>`;
+    box.appendChild(d);
+  });
+}
+function meetingTimeline() {
+  const T = [];
+  const M = MEETINGS ? MEETINGS[S.mi] : MEETING;
+  T.push({at:0, fn:() => { document.getElementById('burst').style.display = 'none'; buildMeeting(); document.getElementById('meet').style.display = 'block';
+    document.getElementById('meetKind').textContent = M.kind === 'emergency' ? 'ประชุมฉุกเฉิน' : 'ประชุม · พบศพ'; sfx('meeting'); }});
+  // with character voices each line lasts as long as its voice (min 3.1 s); the first waits for the "dun dun dunnn" meeting sting
+  let at = VOICE ? 1.8 : 1.2; const mi = S.mi;
+  // "ตามคำเล่า": a line with a told route acts it out on the map; consecutive story lines stay on the map (v1 flickered)
+  const told = (l) => !!(l && l[3] && l[3].length);
+  M.lines.forEach((line, i) => { const [who, txt] = line, dur = slot(mi, i); T.push({at, fn:() => {
+    document.querySelectorAll('.pn.talk').forEach(p => p.classList.remove('talk'));
+    const p = document.getElementById('pn-' + who); p.querySelector('.bub').textContent = txt; p.classList.add('talk'); sfx('talk', {pitch: PITCH[who] || 1});
+    playVoice(mi, i);
+    if (told(line)) fbPlay(who, txt, line[3], dur); else endFlashback();
+  }}); if (told(line) && !told(M.lines[i + 1])) T.push({at:at + dur - 0.1, fn:endFlashback}); at += dur; });
+  if (!M.done && (HALT || cutShort())) { T.push({at:at + 0.6, fn:() => { endFlashback(); document.querySelectorAll('.pn.talk').forEach(p => p.classList.remove('talk')); showEnd(); }}); return T; }
+  // guess card: the viewers get a few seconds to pick a suspect before the AIs vote (&guess=0 turns it off)
+  if (GUESS) { const g0 = at + 0.3; T.push({at:g0, fn:() => { endFlashback(); document.querySelectorAll('.pn.talk').forEach(p => p.classList.remove('talk')); showGuess(true); }});
+    T.push({at:g0 + GUESS_T, fn:() => showGuess(false)}); at = g0 + GUESS_T; }
+  const tv = at + 0.4;
+  T.push({at:tv - 0.3, fn:() => document.querySelectorAll('.pn.talk').forEach(p => p.classList.remove('talk'))});
+  M.votes.forEach(([v, t], i) => T.push({at:tv + i * 0.55, fn:() => {
+    const chip = document.createElement('div'); chip.className = 'vc'; chip.innerHTML = faceSVG(v, A[v].color);
+    document.querySelector('#pn-' + t + ' .votes').appendChild(chip);
+    chip.animate([{transform:'scale(0)'},{transform:'scale(1.15)'},{transform:'scale(1)'}], {duration:260 / S.speed, easing:'cubic-bezier(.34,1.56,.64,1)'}); sfx('vote');
+  }}));
+  const te = tv + M.votes.length * 0.55 + 1.4;
+  T.push({at:te, fn:() => {
+    document.getElementById('meet').style.display = 'none';
+    const o = M.out ? A[M.out] : null;
+    document.getElementById('ejWho').innerHTML = o ? avatarSVG(o.id, o.color) + brandHTML(o) : '';
+    document.getElementById('ejT').textContent = !o ? 'ไม่มีใครถูกโยนออก' : o.imp ? `${o.name} คือคนร้าย` : M.outRole === 'joker' ? `${o.name} คือตัวตลก!` : `${o.name} ไม่ใช่คนร้าย`;
+    document.getElementById('ejS').textContent = !o ? noEjectWhy(M) : o.imp ? 'จับคนร้ายได้!' : M.outRole === 'joker' ? 'โดนหลอกแล้ว ตัวตลกชนะ!' : 'คนร้ายยังอยู่ในหมู่พวกเรา…';
+    document.getElementById('eject').style.display = 'block'; S.ejectAt = S.pt; if (o) sfx('eject'); // nobody out = silent screen
+  }});
+  T.push({at:te + 5.2, fn:() => (TL ? endMeeting() : reset())});
+  return T;
+}
+
+/* ---------- loop ---------- */
+function step(dt) {
+  if (S.phase === 'over') return;
+  if (S.phase === 'win') { S.pt += dt; if (S.pt >= 4.5 && TRUTH.length && TRUTH_ON) { S.phase = 'truth'; S.pt = 0; S.q = truthTimeline(); } else if (S.pt >= 4.5) { S.phase = 'over'; showRoles(); } return; }
+  if (S.phase === 'truth') { S.pt += dt; while (S.q.length && S.pt >= S.q[0].at) S.q.shift().fn(); truthStep(dt); return; }
+  if (S.phase === 'timeup') { S.pt += dt; if (S.pt >= 4.5) { S.phase = 'over'; showRoles(); } return; }
+  if (S.phase === 'play') { S.t = Math.min(S.t + dt, LIVE ? LIVE_T : Infinity); while (FX.length && S.t >= FX[0][0]) fx(FX.shift()[1]); for (const id in A) updateActor(A[id], dt);
+    if (WIN && S.t >= WIN.T) showWin();
+    else if (!WIN && SEATS && S.t >= END_T) showTimeUp();          // tick 60 with no winner: never stall in play
+    else if (!WIN && (HALT || cutShort()) && S.t >= END_T) showEnd(); // halted (live or replay) / cut short: the card comes when playback reaches the end
+    return; }
+  S.pt += dt;
+  const mReady = S.phase !== 'burst' || meetingReady();
+  if (S.phase === 'burst' && S.pt >= 1.8 && !mReady) document.querySelector('#burst .t').textContent = 'กำลังประชุม…';
+  if (S.phase === 'burst' && S.pt >= 1.8 && mReady) { S.phase = 'meet'; S.pt = 0; S.q = meetingTimeline(); }
+  if (S.phase === 'meet') { while (S.q.length && S.pt >= S.q[0].at) S.q.shift().fn(); fbStep(dt); }
+}
+// live: a meeting starts once it is over in the file (or the game ended without it) and, with voices on, once every line
+// has a manifest entry — at most VOICE_WAIT after that, then with whatever voices exist. Until then the burst says กำลังประชุม…
+function meetingReady() {
+  const M = MEETINGS && MEETINGS[S.mi];
+  if (!LIVE || !M) return true;
+  let ok = M.done || !!WIN || !!SEATS || !!HALT; // a halt mid-meeting: play the lines that exist, then the halt card
+  if (ok && VOICE_ON && !voicedAll(S.mi)) {
+    if (M.vSince == null) M.vSince = performance.now();
+    ok = performance.now() - M.vSince >= VOICE_WAIT;
+  }
+  if (!ok && VOICE_ON && performance.now() - vLast >= VOICE_POLL) loadVoice();
+  return ok;
+}
+function render() {
+  for (const id in A) {
+    const a = A[id]; a.el.style.transform = `translate(${a.x}px,${a.y}px)`;
+    a.el.classList.toggle('thinking', S.showTh !== false && !a.dead && S.phase === 'play' && S.t < (a.thUntil || 0));
+  }
+  // thought bubbles of players in the same room stack upward instead of covering each other
+  const byRoom = {};
+  for (const id in A) if (A[id].el.classList.contains('thinking')) (byRoom[A[id].room] = byRoom[A[id].room] || []).push(A[id]);
+  for (const r in byRoom) {
+    let up = 84;
+    for (const a of byRoom[r].sort((p, q) => p.x - q.x)) { const th = a.el.querySelector('.th'); th.style.bottom = up + 'px'; up += th.offsetHeight + 16; }
+  }
+  document.getElementById('fill').style.width = (Math.min(1, TL ? S.frac : S.tasks / TASK_TOTAL) * 100) + '%';
+  if (document.getElementById('eject').style.display === 'block' && S.ejectAt != null) {
+    const k = (S.pt - S.ejectAt) / 4.5, w = document.getElementById('ejWho');
+    w.style.left = (-260 + k * 2440) + 'px'; w.style.transform = `rotate(${k * 540}deg)`;
+  }
+  stage.classList.toggle('show-imp', S.showImp);
+}
+let last = performance.now();
+let WAIT0 = null; const waitEl = document.getElementById('wait');
+function frame(now) { const dt = Math.min(.05, (now - last) / 1000); last = now; if (!S.paused) step(dt * S.speed); render(); AUD.ambient(S.phase === 'play' && !S.paused);
+  // live: playback reached the last tick in the file for more than 1.5 s → "the AIs are still thinking" (new events move LIVE_T on and hide it)
+  const edge = LIVE && !HALT && S.phase === 'play' && S.t >= LIVE_T;
+  if (!edge) WAIT0 = null; else if (WAIT0 == null) WAIT0 = now;
+  waitEl.style.display = edge && now - WAIT0 > 1500 ? 'block' : 'none';
+  requestAnimationFrame(frame); }
+function fit() { const s = Math.min(innerWidth / 1920, innerHeight / 1080); stage.style.transform = `translate(-50%,-50%) scale(${s})`; }
+addEventListener('resize', fit);
+addEventListener('pointerdown', unlockAudio);
+addEventListener('keydown', e => {
+  unlockAudio();
+  // a card is up (stop question, halt / end / error card): Space and R must not restart or resume what it covers
+  if (asking()) { if (e.key === 'Escape') closeAsk(); return; }
+  if (document.getElementById('halt').style.display === 'flex' || !S) { if (e.code === 'Space') e.preventDefault(); return; }
+  if (e.key === 'm' || e.key === 'M') { if (!AUD.toggle()) stopVoice(); return; }
+  if (e.code === 'Space') { S.paused = !S.paused; e.preventDefault(); if (VA) { if (S.paused) VA.pause(); else VA.play().catch(() => {}); } }
+  else if (e.key === '1' || e.key === '2' || e.key === '3') S.speed = [0.5, 1, 2][+e.key - 1];
+  else if (e.key === 't' || e.key === 'T') S.showTh = S.showTh === false;
+  else if (e.key === 'r' || e.key === 'R') { stopVoice(); reset(); }
+});
+/* ---------- timeline mode (?t=data/xxx.json) — plays a game.js timeline tick by tick ---------- */
+function walkSpeed(a, pts) {
+  if (!TL) return SPEED;
+  let d = 0, x = a.x, y = a.y;
+  for (const [px, py] of pts) { d += Math.hypot(px - x, py - y); x = px; y = py; }
+  return Math.max(WALK_SPEED, d / (TICK * 0.9)); // slow and steady, but every walk still lands inside its tick
+}
+// ingest() is incremental: live mode (&live=1) polls the file and feeds only the new events.
+let ING = null, LIVE = false, LIVE_T = 0, END_T = 0, HALT = null, ANON = true, GUESS = true, TRUTH_ON = true; const GUESS_T = 5;
+function fromTimeline(tl) {
+  const q = {}; CAST.forEach(c => q[c.id] = []);
+  MEETINGS = []; WIN = null; ING = {q, cur:null, n:0};
+  ingest(tl);
+  return {q};
+}
+function ingest(tl) {
+  const q = ING.q, nm = id => CAST.find(c => c.id === id).name;
+  const push = (id, s) => { q[id].push(s); if (A && A[id] && A[id].q !== q[id]) A[id].q.push(s.slice()); };
+  const st = ING.st || (ING.st = {pos:{}, dead:{}, body:{}});
+  for (; ING.n < tl.length; ING.n++) {
+    const e = tl[ING.n];
+    const T = e.tick * TICK, at = id => push(id, ['until', T]);
+    if (e.type === 'start') e.players.forEach(p => { const c = CAST.find(x => x.id === p.id); if (c) { c.imp = p.role === 'imp'; c.seat = p.seat; c.role = p.role; c.job = p.job || null; } });
+    else if (e.type === 'thought' && !e.meeting && e.text && q[e.id]) { at(e.id); push(e.id, ['think', e.text]); }
+    else if (e.type === 'seats') SEATS = e.seats;
+    else if (e.type === 'move') { at(e.id); push(e.id, ['go', [e.to]]); }
+    else if (e.type === 'vent') { at(e.id); push(e.id, ['vent', e.to]); }
+    else if (e.type === 'task') { at(e.id); push(e.id, e.fake ? ['fake', TICK * 0.85, null, fakeRunEnds(tl, ING.n)] : ['task', TICK * 0.85, e.done / e.need, e.step === e.of]); }
+    else if (e.type === 'kill') { at(e.by); push(e.by, ['kill', e.victim]); }
+    else if (e.type === 'shoot') { at(e.by); push(e.by, ['shoot', e.target, e.dead, e.hit]); }
+    else if (e.type === 'collect') { at(e.by); push(e.by, ['collect', e.body]); }
+    else if (e.type === 'shadow') FX.push([T + 0.05, 'shadow']);
+    else if (e.type === 'shadow_off') FX.push([T + TICK * 0.92, 'shadow_off']);
+    else if (e.type === 'report' || e.type === 'emergency') {
+      at(e.by); push(e.by, [e.type]);
+      ING.cur = {lines:[[e.by, e.type === 'report' ? `เจอศพ${nm(e.body)}ที่${ROOMS[e.room].name}!` : 'ทุกคนมาคุยกันก่อน!', e.type === 'report' ? [{tick:e.tick, text:nm(e.body)}] : null, e.type === 'report' ? [{room:e.room, people:[{id:e.body, body:true}]}] : null]],
+        votes:[], out:null, done:false, kind:e.type, by:e.by, body:e.body || null};
+      MEETINGS.push(ING.cur);
+    }
+    else if (e.type === 'say' && ING.cur) ING.cur.lines.push([e.id, e.text, e.refs || null, e.scene || null]);
+    else if (e.type === 'vote' && ING.cur) { if (e.target === 'skip') ING.cur.skips = (ING.cur.skips || 0) + 1; else ING.cur.votes.push([e.voter, e.target]); }
+    else if (e.type === 'eject' && ING.cur) { ING.cur.out = e.id; ING.cur.outRole = e.role || null; ING.cur.done = true; }
+    else if (e.type === 'win') WIN = {T:T + TICK, side:e.side, by:e.by, id:e.id || null};
+    else if (e.type === 'halt' && !WIN && !HALT) HALT = {provider:e.provider || null, message:e.message || '', shown:false}; // a halt after a win is ignored
+    // flashback snapshots: where everyone is after each tick (the eject state goes to tick + .5 so the report tick keeps the bodies)
+    if (e.type === 'start') e.players.forEach(p => { st.pos[p.id] = 'C'; });
+    else if (e.type === 'move' || e.type === 'vent') { if (e.type === 'vent') TRUTH.push({tick:e.tick, kind:'vent', by:e.id, from:e.from, to:e.to}); st.pos[e.id] = e.to; }
+    else if (e.type === 'kill') { st.dead[e.victim] = 1; st.body[e.victim] = e.room; TRUTH.push({tick:e.tick, kind:'kill', by:e.by, victim:e.victim, room:e.room}); }
+    else if (e.type === 'eject') { if (e.id) st.dead[e.id] = 1; st.body = {}; for (const id in st.pos) if (!st.dead[id]) st.pos[id] = 'C'; }
+    else if (e.type === 'shoot') { st.dead[e.dead] = 1; st.body[e.dead] = e.room; TRUTH.push({tick:e.tick, kind:'shoot', by:e.by, victim:e.target, dead:e.dead, hit:e.hit, room:e.room}); }
+    else if (e.type === 'collect') { delete st.body[e.body]; TRUTH.push({tick:e.tick, kind:'collect', by:e.by, victim:e.body, room:e.room}); }
+    else if (e.type === 'shadow') TRUTH.push({tick:e.tick, kind:'shadow', by:e.by});
+    if (['start', 'move', 'vent', 'kill', 'eject', 'shoot', 'collect'].includes(e.type)) SNAP[e.type === 'eject' ? e.tick + 0.5 : e.tick] = JSON.parse(JSON.stringify(st));
+    if (e.type !== 'thought' && e.type !== 'seats' && e.tick && LIVE_T !== Infinity) LIVE_T = Math.max(LIVE_T, T + TICK);
+    if (e.type !== 'thought' && e.type !== 'seats' && e.type !== 'halt' && e.tick) END_T = Math.max(END_T, T + TICK); // end of the last played tick
+  }
+  if (WIN || SEATS) LIVE_T = Infinity; // game over: play out freely
+  if (HALT && LIVE && S && STOPPED) showHalt(); // this page pressed หยุดเกม: the card at once · otherwise when playback reaches the end (step)
+  if (S) syncStop();
+}
+/* ---------- "ตามคำเล่า": while a meeting line is spoken, the map acts out the route the speaker TELLS (say.scene from agent.js) ----------
+   VreKi 2026-10-28: "ภาพย้อนดูเหตุการณ์อยากให้เป็นไปตามเหตุการณ์ที่แต่ละคนเล่า ไม่จำเป็นต้องเป็นภาพเหตุการณ์จริง … ใครไม่มีในบทพูดก็ไม่ต้องโผล่
+   … จำลองสถานการณ์ขึ้นมาให้เห็นถึงแม้จะมีบางคนโกหกก็ตาม" · slower than v1 · no flicker. SNAP (the real positions) is kept for the truth reveal. */
+const SNAP = {};
+let FB = null;
+const FB_WALK = 150;   // px/s — a stroll, slower than the map (VreKi: v1 moved too fast)
+function rtag(id) { const M = MEETINGS && MEETINGS[S.mi]; return M && M.by === id ? `<div class="rtag">${M.kind === 'report' ? 'คนพบศพ' : 'กดปุ่มประชุม'}</div>` : ''; }
+function snapAt(t) { let best = null, bk = -1; for (const k in SNAP) { const kk = +k; if (kk <= t && kk > bk) { bk = kk; best = SNAP[k]; } } return best; }
+// shortest hall route between two rooms (BFS over EDGES) → the points a walker follows
+function routePts(from, to) {
+  if (from === to) return [];
+  const prev = {[from]: null}, q = [from];
+  while (q.length) { const c = q.shift(); if (c === to) break;
+    for (const k in EDGES) { const [x, y] = k.split('-'), n = x === c ? y : y === c ? x : null; if (n && !(n in prev)) { prev[n] = c; q.push(n); } } }
+  if (!(to in prev)) return [];
+  const rooms = []; for (let c = to; c; c = prev[c]) rooms.unshift(c);
+  const pts = []; for (let i = 1; i < rooms.length; i++) pts.push(...edge(rooms[i - 1], rooms[i]));
+  return pts;
+}
+function fbEnter(who, txt) {
+  if (!FB) {
+    FB = {save:{}};
+    for (const id in A) { const a = A[id]; FB.save[id] = {x:a.x, y:a.y, disp:a.el.style.display, dead:a.el.classList.contains('dead')}; }
+    document.getElementById('meet').classList.add('fbhide'); stage.classList.add('fb'); stage.classList.remove('anon');
+  }
+  const c = CAST.find(x => x.id === who);
+  document.querySelector('#fbv .lbl').textContent = 'ตามคำเล่าของ' + c.name;
+  document.getElementById('fbcap').innerHTML = `<div class="fav">${faceSVG(who, c.color)}</div>${brandHTML(c)}<div class="ftx"><b>${esc(c.name)}</b>${esc(txt)}</div>`;
+}
+function fbPlay(who, txt, scene, dur) {
+  fbEnter(who, txt);
+  const steps = scene.slice(-Math.max(1, Math.floor(dur / 1.8)));          // a short line tells fewer rooms
+  Object.assign(FB, {who, steps, k:-1, t:0, per:Math.max(1.8, (dur - 0.4) / steps.length), walk:null, from:null, room:null}); // a new speaker starts in their first room
+  for (const id in A) { const a = A[id]; a.el.style.display = 'none'; a.el.classList.remove('dead', 'fbfocus', 'fbdim'); }
+  const sp = A[who]; sp.el.style.display = ''; sp.el.classList.add('fbfocus');
+  fbStepTo(0);
+}
+function fbStepTo(k) {
+  FB.k = k; FB.t = 0;
+  const st = FB.steps[k], sp = A[FB.who], dest = slotPos(st.room, 0);
+  for (const id in A) if (id !== FB.who) A[id].el.style.display = 'none';
+  st.people.forEach((pp, i) => {
+    const a = A[pp.id]; if (!a) return;
+    a.el.style.display = ''; a.el.classList.toggle('dead', !!pp.body); [a.x, a.y] = slotPos(st.room, i + 1);
+    if (!QUIET) a.el.animate([{opacity:0}, {opacity:1}], {duration:500 / S.speed});
+  });
+  if (k === 0 && FB.from == null) { [sp.x, sp.y] = dest; FB.walk = null; }
+  else { const pts = [...routePts(FB.room || st.room, st.room), dest]; let d = 0, x = sp.x, y = sp.y;
+    for (const [px, py] of pts) { d += Math.hypot(px - x, py - y); x = px; y = py; }
+    FB.walk = {pts, i:0, spd:Math.max(FB_WALK, d / (FB.per * 0.7))}; }
+  FB.room = st.room; FB.from = true;
+}
+function fbStep(dt) {
+  if (!FB || !FB.steps) return;
+  FB.t += dt; const w = FB.walk, sp = A[FB.who];
+  if (w) { let left = w.spd * dt;
+    while (left > 0 && w.i < w.pts.length) { const [tx, ty] = w.pts[w.i], dx = tx - sp.x, dy = ty - sp.y, d = Math.hypot(dx, dy);
+      if (d <= left) { sp.x = tx; sp.y = ty; left -= d; w.i++; } else { sp.x += dx / d * left; sp.y += dy / d * left; left = 0; } } }
+  if (FB.t >= FB.per && FB.k < FB.steps.length - 1) fbStepTo(FB.k + 1);
+}
+function endFlashback() {
+  if (!FB) return;
+  for (const id in A) { const a = A[id], s = FB.save[id]; a.x = s.x; a.y = s.y; a.el.style.display = s.disp; a.el.classList.toggle('dead', s.dead); a.el.classList.remove('fbfocus', 'fbdim'); }
+  FB = null; stage.classList.remove('fb'); stage.classList.toggle('anon', ANON); document.getElementById('meet').classList.remove('fbhide');
+}
+function endMeeting() {
+  stopVoice();
+  document.getElementById('eject').style.display = 'none';
+  const out = MEETINGS[S.mi] && MEETINGS[S.mi].out;
+  S.mi++; S.phase = 'play';
+  document.getElementById('round').textContent = 'รอบที่ ' + (S.mi + 1);
+  if (out) A[out].dead = true;
+  for (const id in A) if (A[id].dead) { A[id].el.style.display = 'none'; release(A[id]); }
+  occ.C = []; let i = 0;
+  for (const id in A) {
+    const a = A[id]; if (a.dead) continue;
+    release(a); a.room = 'C'; a.slot = i; occ.C[i] = a.id; [a.x, a.y] = C_SLOTS[i]; i++;
+    if (a.busy && a.busy.type !== 'until') a.busy = null;
+    a.el.querySelector('.rg').innerHTML = '';
+  }
+  feed('ทุกคนกลับห้องประชุม · เริ่มรอบใหม่');
+}
+function noEjectWhy(M) {
+  const n = {}; for (const [, t] of M.votes || []) n[t] = (n[t] || 0) + 1;
+  const top = Math.max(0, ...Object.values(n)), skips = M.skips || 0;
+  return skips > 0 && skips >= top ? 'ส่วนใหญ่กดข้าม ไม่โหวตใคร' : top > 0 ? 'คะแนนเสมอกัน' : 'ไม่มีใครโหวต';
+}
+function showWin() {
+  S.phase = 'win'; S.pt = 0; fx('shadow_off');
+  const imps = CAST.filter(c => c.imp), solo = WIN.id && CAST.find(c => c.id === WIN.id), face = solo || imps[0], w = document.getElementById('ejWho');
+  w.innerHTML = avatarSVG(face.id, face.color) + brandHTML(face); w.style.left = '845px'; w.style.transform = 'none';
+  document.getElementById('ejT').textContent = ({crew:'ลูกเรือชนะ!', imp:'คนร้ายชนะ!', joker:'ตัวตลกชนะ!', undertaker:'สัปเหร่อชนะ!'})[WIN.side];
+  document.getElementById('ejS').textContent = WIN.side === 'joker' ? `${solo.name} ถูกโหวตออก = ตัวตลกชนะ · คนร้ายคือ ${imps.map(c => c.name).join(', ')}`
+    : WIN.side === 'undertaker' ? `${solo.name} เก็บศพครบ = สัปเหร่อชนะ · คนร้ายคือ ${imps.map(c => c.name).join(', ')}`
+    : `คนร้ายคือ ${imps.map(c => c.name).join(', ')} · ` + ({tasks:'ภารกิจครบ', kills:'ฆ่าจนเหลือเท่ากัน', vote:'จับคนร้ายได้'})[WIN.by];
+  document.getElementById('eject').style.display = 'block'; S.ejectAt = null;
+  sfx(WIN.side === 'crew' ? 'win_crew' : 'win_imp');
+}
+// tick 60 reached with no winner (the file ends with `seats` and no `win`): an end card in the win-screen style, then the role cards
+function showTimeUp() {
+  S.phase = 'timeup'; S.pt = 0; fx('shadow_off');
+  const w = document.getElementById('ejWho'); w.innerHTML = ''; w.style.transform = 'none';
+  document.getElementById('ejT').textContent = 'หมดเวลา · ไม่มีฝ่ายชนะ';
+  document.getElementById('ejS').textContent = '';
+  document.getElementById('eject').style.display = 'block'; S.ejectAt = null;
+}
+// the game stopped early (quota, error, stop button) — or the file could not be read: a centred card, back to the lobby
+function showCard(title, msg) {
+  document.getElementById('haltT').textContent = title; document.getElementById('haltT').classList.toggle('long', title.length > 20);
+  document.getElementById('haltM').textContent = msg || '';
+  document.getElementById('halt').style.display = 'flex';
+}
+function showHalt() {
+  if (!HALT || HALT.shown) return;
+  HALT.shown = true; S.paused = true; stopVoice(); syncStop();
+  const co = HALT.provider && COMPANY[HALT.provider]; // provider null = stop button / game error: the message says it all
+  showCard('เกมหยุดแล้ว', co ? `${co}: ${HALT.message}` : HALT.message);
+}
+const COMPANY = {claude:'Claude', codex:'ChatGPT', gemini:'Gemini'};
+// a replay that ends with no win, no seats and no halt (the game was closed mid-way): an end card at its last tick
+const cutShort = () => !LIVE && TL && !WIN && !SEATS && !HALT;
+let CUT_SHOWN = false;
+function showEnd() {
+  if (HALT) return showHalt();
+  if (CUT_SHOWN) return;
+  CUT_SHOWN = true; S.paused = true; stopVoice();
+  showCard('เกมนี้ถูกหยุดกลางคัน', '');
+}
+/* ---------- stop button (live only): centred confirm card → POST /api/abort → the halt card once the halt is in the file ---------- */
+const stopBtn = document.getElementById('stopBtn'), askStop = document.getElementById('askStop');
+let LOST = false;    // live: the game stopped answering
+let STOPPED = false; // this page asked the game to stop: its halt card comes at once, not at the end of playback
+function syncStop() { stopBtn.style.display = LIVE && TL && !WIN && !SEATS && !HALT && !LOST ? 'block' : 'none'; }
+const asking = () => askStop.style.display === 'flex';
+function openAsk() { askStop.style.display = 'flex'; askStop.querySelector('.keep').focus(); } // Enter keeps watching
+function closeAsk() { askStop.style.display = 'none'; }
+stopBtn.addEventListener('click', openAsk);
+askStop.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-stop]'); if (!b) return;
+  closeAsk();
+  if (b.dataset.stop !== 'yes') return;
+  STOPPED = true; stopBtn.disabled = true; stopBtn.textContent = 'กำลังหยุด…';
+  fetch('/api/abort', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); })
+    .catch(() => { STOPPED = false; stopBtn.disabled = false; stopBtn.textContent = 'หยุดเกม'; });
+});
+/* ---------- ม่านเงา on screen: the map goes dark + a banner, so viewers know the คนร้าย used it (VreKi 2026-10-28) ---------- */
+const FX = [];
+function fx(kind) {
+  const ban = document.getElementById('shadowban');
+  if (kind === 'shadow') { stage.classList.add('shadowfx'); ban.classList.remove('small'); ban.style.display = 'flex'; sfx('shadow');
+    clearTimeout(fx.k); fx.k = setTimeout(() => ban.classList.add('small'), QUIET ? 0 : 2600 / S.speed); }
+  else if (kind === 'shadow_off') { stage.classList.remove('shadowfx'); ban.style.display = 'none'; }
+}
+// "ปัง!" comic burst where the captain fired
+const FB_ZOOM = {s:.85, ox:960, oy:88}; // same as the #stage.fb map transform
+function bang(x, y) {
+  if (stage.classList.contains('fb')) { x = FB_ZOOM.ox + (x - FB_ZOOM.ox) * FB_ZOOM.s; y = FB_ZOOM.oy + (y - FB_ZOOM.oy) * FB_ZOOM.s; }
+  const b = document.createElement('div'); b.className = 'bang'; b.textContent = 'ปัง!'; b.style.left = x + 'px'; b.style.top = (y - 70) + 'px';
+  stage.appendChild(b); b.animate([{transform:'translate(-50%,-50%) scale(.3)', opacity:0}, {transform:'translate(-50%,-50%) scale(1.15)', opacity:1, offset:.2},
+    {transform:'translate(-50%,-50%) scale(1)', opacity:1, offset:.7}, {transform:'translate(-50%,-50%) scale(1)', opacity:0}], {duration:1400 / S.speed}).onfinish = () => b.remove();
+}
+const ROLE_LABEL = (c) => ({imp:'คนร้าย', joker:'ตัวตลก', undertaker:'สัปเหร่อ'})[c.role] || ({captain:'กัปตัน', engineer:'ช่างซ่อม'})[c.job] || 'ลูกเรือ';
+function showRoles() {
+  const el = document.getElementById('roles');
+  el.querySelector('.ppl').innerHTML = CAST.map(c => `<div class="gp ${c.role === 'imp' ? 'bad' : (c.role === 'joker' || c.role === 'undertaker') ? 'odd' : ''}"><div class="fav">${faceSVG(c.id, c.color)}</div>${brandHTML(c)}<div class="gn">${c.name}</div><div class="rl">${ROLE_LABEL(c)}</div></div>`).join('');
+  el.style.display = 'flex';
+}
+/* ---------- truth reveal: after the result, replay what really happened (kills + vents) with everyone's face ---------- */
+const TRUTH = [];   // [{tick, kind:'kill'|'vent', by, victim, room, from, to}] filled by ingest
+let TR = null;
+function truthTimeline() {
+  // what matters: kills, shots, bodies collected, ม่านเงา, and the คนร้าย's own vents (the ช่างซ่อม venting is not a secret worth replaying)
+  const key = TRUTH.filter(m => m.kind !== 'vent' || (CAST.find(c => c.id === m.by) || {}).role === 'imp');
+  const T = [], moments = key.length > 8 ? key.filter(m => m.kind !== 'vent').slice(-8) : key;
+  if (!moments.length) return T;
+  T.push({at:0, fn:() => { document.getElementById('eject').style.display = 'none'; stage.classList.add('fb', 'truth'); stage.classList.remove('anon');
+    document.querySelector('#fbv .lbl').textContent = 'เฉลยความจริง'; document.getElementById('fbcap').innerHTML = ''; sfx('meeting'); }});
+  moments.forEach((m, i) => {
+    const at = 1.2 + i * 6;
+    T.push({at, fn:() => truthShow(m, m.tick - 1, true)});
+    T.push({at:at + 2.2, fn:() => truthShow(m, m.tick, false)});
+  });
+  T.push({at:1.2 + moments.length * 6 + 0.5, fn:() => { TR = null; stage.classList.remove('fb', 'truth'); showRoles(); S.phase = 'over'; }});
+  return T;
+}
+function truthShow(m, tick, first) {
+  const s = snapAt(tick); if (!s) return;
+  const byRoom = {}, focus = new Set([m.by, m.victim].filter(Boolean));
+  TR = TR || {from:{}, to:{}, t:0, dur:1.8};
+  TR.t = 0;
+  for (const c of CAST) {
+    const a = A[c.id], deadNow = !!s.dead[c.id], room = deadNow ? s.body[c.id] : s.pos[c.id];
+    a.el.style.display = room ? '' : 'none'; a.el.classList.toggle('dead', deadNow);
+    a.el.classList.toggle('fbfocus', focus.has(c.id)); a.el.classList.toggle('fbdim', !focus.has(c.id));
+    if (!room) { delete TR.to[c.id]; continue; }
+    const i = (byRoom[room] = (byRoom[room] || 0) + 1) - 1, to = slotPos(room, i);
+    TR.from[c.id] = first ? to : [a.x, a.y]; TR.to[c.id] = to;
+    if (first) [a.x, a.y] = to;
+  }
+  const k = CAST.find(c => c.id === m.by), v = m.victim && CAST.find(c => c.id === m.victim);
+  const what = m.kind === 'kill' ? `${k.name} ฆ่า ${v.name} ที่${ROOMS[m.room].name}`
+    : m.kind === 'shoot' ? (m.hit ? `กัปตัน ${k.name} ยิง ${v.name} · โดนคนร้าย!` : `กัปตัน ${k.name} ยิง ${v.name} · พลาด ${k.name} ตายเอง`)
+    : m.kind === 'collect' ? `สัปเหร่อ ${k.name} เก็บศพ ${v.name} ไปซ่อน`
+    : m.kind === 'shadow' ? `คนร้าย ${k.name} ใช้ม่านเงา`
+    : `${k.name} มุดท่อจาก${ROOMS[m.from].name} ไป${ROOMS[m.to].name}`;
+  document.getElementById('fbcap').innerHTML = `<div class="fav">${faceSVG(k.id, k.color)}</div>${brandHTML(k)}<div class="ftx"><b>ความจริง</b>${esc(what)}</div>`;
+  if (!first && m.kind === 'kill' && !QUIET) { document.getElementById('flash').animate([{opacity:.45}, {opacity:0}], {duration:450}); sfx('kill'); }
+  if (!first && m.kind === 'vent') sfx('vent');
+  if (!first && m.kind === 'shoot') { if (!QUIET) bang(A[m.by].x, A[m.by].y); sfx('shot'); }
+  if (!first && m.kind === 'collect') sfx('collect');
+  if (!first && m.kind === 'shadow') sfx('shadow');
+}
+function truthStep(dt) {
+  if (!TR) return;
+  TR.t += dt; const k = Math.min(1, TR.t / TR.dur), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+  for (const id in TR.to) { const a = A[id], [fx, fy] = TR.from[id], [tx, ty] = TR.to[id]; a.x = fx + (tx - fx) * e; a.y = fy + (ty - fy) * e; }
+}
+function showGuess(on) {
+  const el = document.getElementById('guess');
+  if (on) {
+    const alive = CAST.filter(c => !A[c.id].dead);
+    el.querySelector('.ppl').innerHTML = alive.map(c => `<div class="gp"><div class="fav">${faceSVG(c.id, c.color)}</div>${brandHTML(c)}<div class="gn">${c.name}</div></div>`).join('');
+    const bar = el.querySelector('.bar i'); bar.getAnimations().forEach(x => x.cancel());
+    if (!QUIET) bar.animate([{transform:'scaleX(1)'}, {transform:'scaleX(0)'}], {duration:GUESS_T * 1000 / S.speed, fill:'forwards'});
+  }
+  el.style.display = on ? 'flex' : 'none';
+}
+
+drawMap(); fit();
+const qs = new URLSearchParams(location.search), tlUrl = qs.get('t');
+// only the game's own files: a link with ?t=<another site> must never be fetched (its voice files would be next)
+const T_OK = /^\/games\/[A-Za-z0-9_]+\.json$/;
+LIVE = qs.get('live') === '1';
+ANON = qs.get('anon') !== '0'; stage.classList.toggle('anon', ANON);
+GUESS = qs.get('guess') !== '0'; TRUTH_ON = qs.get('truth') !== '0';
+// first load: a live file can be caught mid-rewrite → retry every 1 s, up to 10 tries, then a Thai error card
+function loadGame(tries) {
+  fetch(tlUrl, {cache:'no-store'}).then(r => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))))
+    .then(tl => { if (!Array.isArray(tl) || !tl.length) throw new Error('not a timeline'); return tl; })
+    .then(begin, () => { if (tries > 1) setTimeout(() => loadGame(tries - 1), 1000); else showCard('โหลดเกมไม่ได้ ลองรีเฟรชหน้า', ''); });
+}
+function begin(tl) {
+  TL = fromTimeline(tl);
+  // voices next to the timeline (runner.js) · &voice=0 turns them off · live re-reads the manifest while a meeting waits (meetingReady)
+  VOICE_ON = qs.get('voice') !== '0';
+  if (VOICE_ON) { VOICE_MF = tlUrl.replace(/\.json$/, '_voice/manifest.json'); VOICE_BASE = VOICE_MF.replace('manifest.json', ''); loadVoice(); }
+  reset(); syncStop();
+  const ff = +qs.get('ff') || 0; QUIET = true; for (let i = 0; i < ff / 0.05 && S.phase !== 'over' && !S.paused; i++) step(0.05); QUIET = false;
+  if (qs.get('freeze') === '1') { S.paused = true; document.getElementById('snd').style.display = 'none'; }
+  requestAnimationFrame(frame);
+  // live: re-read the file every 3 s (runner.js rewrites it after every tick / meeting) and feed only the new events · stops at the end or a halt
+  if (LIVE) { let fails = 0; const poll = setInterval(() => { if (HALT || (LIVE_T === Infinity && (WIN || SEATS))) { clearInterval(poll); return; }
+    fetch(tlUrl, {cache:'no-store'}).then(r => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))).then(tl => { fails = 0; ingest(tl); })
+      .catch(() => { if (++fails < 10) return; // ~30 s without the game: the black window was closed (or the PC slept)
+        clearInterval(poll); LOST = true; S.paused = true; stopVoice(); syncStop(); showCard('ติดต่อเกมไม่ได้ · เกมอาจถูกปิดไปแล้ว', ''); }); }, 3000); }
+}
+if (tlUrl && T_OK.test(tlUrl)) loadGame(LIVE ? 10 : 1);
+else if (tlUrl) showCard('โหลดเกมไม่ได้ ลองรีเฟรชหน้า', '');
+else { reset(); requestAnimationFrame(frame); }
+</script>
+</body>
+</html>

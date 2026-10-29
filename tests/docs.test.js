@@ -13,8 +13,8 @@ test('README says what to type to install, links the clip and warns about quota'
   const r = read('README.md');
   assert.ok(r.includes('เปิด Claude Code หรือ Codex ในโฟลเดอร์นี้ แล้วพิมพ์ว่า'));
   assert.ok(r.includes('อ่าน INSTALL-FOR-AI.md แล้วติดตั้งเกมนี้ให้หน่อย'));
-  // the clip link is a placeholder until release day, then a YouTube URL
-  assert.match(r, /\{\{CLIP_URL\}\}|https:\/\/(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)/);
+  // the clip link: a placeholder, the channel's videos page (released before the clip was up), or the clip's YouTube URL
+  assert.match(r, /\{\{CLIP_URL\}\}|https:\/\/(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/@VreKi_018\/videos)/);
   assert.match(r, /93–125/);
   assert.match(r, /claude update/);
 });
